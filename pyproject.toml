@@ -1,16 +1,21 @@
 [project]
 name = "yt-downloader"
 version = "0.1.0"
-description = "Add your description here"
+description = "YouTube video downloader and player web app"
 readme = "README.md"
 authors = [
     { name = "WewennJr", email = "ewennlegros@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "yt-dlp>=2026.8.19",
+    "flask>=3.0.0",
+    "static-ffmpeg>=3.0",
+]
 
 [project.scripts]
-yt-dl = "yt_downloader.app:main"
+yt-dl-cli = "yt_downloader.app:main"
+yt-dl-web = "yt_downloader.web:main"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]

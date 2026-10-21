@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader & Player</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YouTube Downloader & Player</h1>
+            <p>Watch and download YouTube videos without ads</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <div class="input-group">
+                    <input type="url" id="urlInput" placeholder="Enter YouTube URL (e.g., https://www.youtube.com/watch?v=...)" required>
+                    <button id="fetchBtn" onclick="fetchVideoInfo()">Load Video</button>
+                </div>
+
+                <div class="settings" id="settingsPanel" style="display: none;">
+                    <div class="setting-group" id="audioLangGroup">
+                        <label for="audioLanguage">Audio Language</label>
+                        <select id="audioLanguage" disabled></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Fetching video information...</p>
+            </div>
+
+            <div class="downloading" id="downloading">
+                <div class="spinner"></div>
+                <p id="downloadStatus">Downloading video (1080p 60fps max)...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="video-section" id="videoSection">
+                <div class="video-info">
+                    <img id="thumbnail" class="video-thumbnail" alt="Video thumbnail">
+                    <div class="video-meta">
+                        <h2 id="videoTitle"></h2>
+                        <div class="meta">
+                            <span id="videoUploader"></span>
+                            <span id="videoDuration"></span>
+                            <span id="videoViews"></span>
+                            <span id="videoQuality" class="quality-badge"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="video-player">
+                    <video id="videoPlayer" controls controlsList="nodownload" disablePictureInPicture preload="metadata"></video>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-primary" id="playBtn" onclick="loadVideo()" disabled>Play in Browser</button>
+                    <button class="btn-secondary" id="downloadBtn" onclick="downloadVideo()" disabled>Download</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentVideoUrl = '';
+        let currentVideoInfo = null;
+        let currentDefaults = null;
+        let currentTaskId = null;
+        let statusPollInterval = null;
+
+        function formatDuration(seconds) {
+            if (!seconds) return 'Unknown';
+            seconds = Math.floor(seconds);
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function formatViews(count) {
+            if (!count) return 'Unknown views';
+            if (count >= 1e9) return (count / 1e9).toFixed(1) + 'B views';
+            if (count >= 1e6) return (count / 1e6).toFixed(1) + 'M views';
+            if (count >= 1e3) return (count / 1e3).toFixed(1) + 'K views';
+            return count + ' views';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('active');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('active', show);
+            document.getElementById('fetchBtn').disabled = show;
+        }
+
+        function showDownloading(show) {
+            document.getElementById('downloading').classList.toggle('active', show);
+            if (show) {
+                document.getElementById('videoSection').classList.remove('active');
+            }
+        }
+
+        function resetPlayer() {
+            const video = document.getElementById('videoPlayer');
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            document.getElementById('videoQuality').textContent = '';
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('downloadBtn').disabled = true;
+        }
+
+        async function fetchVideoInfo() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+
+            hideError();
+            showLoading(true);
+
+            try {
+                const response = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch video info');
+                }
+
+                if (statusPollInterval) clearInterval(statusPollInterval);
+                currentTaskId = null;
+                resetPlayer();
+
+                currentVideoUrl = url;
+                currentVideoInfo = data;
+                currentDefaults = data.defaults;
+                displayVideoInfo(data);
+                applyDefaults();
+                document.getElementById('settingsPanel').style.display = 'grid';
+
+                // Téléchargement auto avec les défauts (langue originale)
+                startDownload();
+
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function displayVideoInfo(data) {
+            document.getElementById('thumbnail').src = data.thumbnail || '';
+            document.getElementById('videoTitle').textContent = data.title || '';
+            document.getElementById('videoUploader').textContent = data.uploader || 'Unknown';
+            document.getElementById('videoDuration').textContent = formatDuration(data.duration);
+            document.getElementById('videoViews').textContent = formatViews(data.view_count);
+        }
+
+        function applyDefaults() {
+            const group = document.getElementById('audioLangGroup');
+            const select = document.getElementById('audioLanguage');
+            const langs = (currentVideoInfo && currentVideoInfo.audio_languages) || [];
+            const originalCode = (currentDefaults && currentDefaults.audio_language) || '';
+            const originalEntry = langs.find(l => l.original);
+            const originalName = originalEntry ? originalEntry.name : originalCode;
+
+            // Par défaut : langue originale (valeur vide). Les autres pistes sont proposées en plus.
+            select.innerHTML = '';
+            const def = document.createElement('option');
+            def.value = '';
+            def.textContent = 'Original' + (originalName ? ` (${originalName})` : '');
+            select.appendChild(def);
+
+            const others = langs.filter(l => !l.original);
+            others.forEach(l => {
+                const opt = document.createElement('option');
+                opt.value = l.language;
+                opt.textContent = l.name;
+                select.appendChild(opt);
+            });
+
+            select.value = '';
+            select.disabled = others.length === 0;
+            group.style.display = (others.length || originalName) ? 'flex' : 'none';
+        }
+
+        async function startDownload() {
+            if (statusPollInterval) clearInterval(statusPollInterval);
+            currentTaskId = null;
+            resetPlayer();
+            hideError();
+            showDownloading(true);
+            document.getElementById('downloadStatus').textContent = 'Downloading video (1080p 60fps max)...';
+            document.getElementById('progressFill').style.width = '0%';
+
+            try {
+                const response = await fetch('/api/prepare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: currentVideoUrl,
+                        audio_lang: document.getElementById('audioLanguage').value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to start download');
+                }
+
+                currentTaskId = data.task_id;
+                pollStatus(currentTaskId);
+
+            } catch (err) {
+                showError(err.message);
+                showDownloading(false);
+            }
+        }
+
+        function pollStatus(taskId) {
+            if (statusPollInterval) clearInterval(statusPollInterval);
+
+            statusPollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/status/${taskId}`);
+                    const data = await response.json();
+
+                    // Une autre tâche a pris le relais entre-temps
+                    if (taskId !== currentTaskId) return;
+
+                    if (!response.ok) {
+                        clearInterval(statusPollInterval);
+                        showError(data.error || 'Task not found');
+                        showDownloading(false);
+                    } else if (data.status === 'downloading') {
+                        const pct = data.progress || 0;
+                        document.getElementById('progressFill').style.width = pct + '%';
+                        document.getElementById('downloadStatus').textContent =
+                            pct >= 99 ? 'Finalizing (merging & checking audio)...'
+                                      : `Downloading video (1080p 60fps max)... ${pct}%`;
+                    } else if (data.status === 'ready') {
+                        clearInterval(statusPollInterval);
+                        document.getElementById('videoQuality').textContent =
+                            [data.quality, data.audio ? data.audio.toUpperCase() : null].filter(Boolean).join(' · ');
+                        document.getElementById('progressFill').style.width = '100%';
+                        showDownloading(false);
+                        document.getElementById('videoSection').classList.add('active');
+                        document.getElementById('playBtn').disabled = false;
+                        document.getElementById('downloadBtn').disabled = false;
+                        loadVideo();
+                    } else if (data.status === 'error') {
+                        clearInterval(statusPollInterval);
+                        showError(data.error || 'Download failed');
+                        showDownloading(false);
+                    }
+                } catch (err) {
+                    console.error('Status poll error:', err);
+                }
+            }, 1000);
+        }
+
+        function loadVideo() {
+            if (!currentTaskId) return;
+
+            const video = document.getElementById('videoPlayer');
+            video.muted = false;
+            video.volume = 1;
+            video.src = `/api/stream/${currentTaskId}`;
+            video.load();
+            video.play().catch(() => {});
+        }
+
+        function downloadVideo() {
+            if (!currentTaskId) return;
+            window.location.href = `/api/download/${currentTaskId}`;
+        }
+
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchVideoInfo();
+        });
+
+        // Changer de langue audio : on retélécharge la vidéo avec la nouvelle piste
+        document.getElementById('audioLanguage').addEventListener('change', () => {
+            if (currentVideoUrl) startDownload();
+        });
+    </script>
+</body>
+</html>
