@@ -55,3 +55,6 @@ htmlcov/
 
 # Local development
 *.local
+
+# Scripts
+*.sh
