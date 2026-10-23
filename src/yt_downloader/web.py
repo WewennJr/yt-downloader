@@ -31,6 +31,22 @@ YDL_OPTS_BASE = {
     'noplaylist': True,
 }
 
+# --- Cookies YouTube (contourne "Sign in to confirm you're not a bot") ---
+# 1) un fichier cookies.txt à côté de web.py (ou chemin dans YT_COOKIES_FILE)
+# 2) sinon, les cookies d'un navigateur : YT_COOKIES_BROWSER=firefox (recommandé sous Windows)
+COOKIES_FILE = os.environ.get('YT_COOKIES_FILE') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+COOKIES_BROWSER = os.environ.get('YT_COOKIES_BROWSER', '').strip()
+
+if os.path.isfile(COOKIES_FILE):
+    YDL_OPTS_BASE['cookiefile'] = COOKIES_FILE
+    print(f'[cookies] fichier utilisé : {COOKIES_FILE}')
+elif COOKIES_BROWSER:
+    YDL_OPTS_BASE['cookiesfrombrowser'] = (COOKIES_BROWSER,)
+    print(f'[cookies] cookies du navigateur : {COOKIES_BROWSER}')
+else:
+    print('[cookies] aucun cookie configuré (cookies.txt ou YT_COOKIES_BROWSER)')
+
 # ffmpeg est un programme externe : static-ffmpeg le télécharge au 1er lancement
 # et l'ajoute au PATH du process (sans rien faire si ffmpeg est déjà dans le PATH).
 static_ffmpeg.add_paths(weak=True)
@@ -52,6 +68,15 @@ def build_format_selector(audio_lang=''):
         return FORMAT_SELECTOR
     return (f'bv*+ba[language={audio_lang}][acodec^=mp4a]/'
             f'bv*+ba[language={audio_lang}]/' + FORMAT_SELECTOR)
+
+
+def clean_error(e):
+    """Message d'erreur lisible : retire les codes couleur de yt-dlp et explique le blocage anti-bot"""
+    msg = re.sub(r'\x1b\[[0-9;]*m', '', str(e)).strip()
+    if 'Sign in to confirm' in msg:
+        return ("YouTube bloque ce serveur (vérification anti-bot). Configure des cookies : "
+                "un fichier cookies.txt à côté de web.py, ou la variable YT_COOKIES_BROWSER=firefox.")
+    return msg
 
 
 def update_task(task_id, **kwargs):
@@ -211,7 +236,7 @@ def run_download(task_id, url, audio_lang=''):
             filename=f'{safe_title}{os.path.splitext(filepath)[1]}',
         )
     except Exception as e:
-        update_task(task_id, status='error', error=str(e))
+        update_task(task_id, status='error', error=clean_error(e))
 
 
 @app.route('/')
@@ -239,7 +264,7 @@ def api_info():
             'defaults': select_default_formats(info),
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': clean_error(e)}), 500
 
 
 @app.route('/api/prepare', methods=['POST'])
