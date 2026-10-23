@@ -3,9 +3,7 @@ name = "yt-downloader"
 version = "0.1.0"
 description = "YouTube video downloader and player web app"
 readme = "README.md"
-authors = [
-    { name = "WewennJr", email = "ewennlegros@gmail.com" }
-]
+authors = [{ name = "WewennJr"}]
 requires-python = ">=3.12"
 dependencies = [
     "yt-dlp>=2026.8.19",

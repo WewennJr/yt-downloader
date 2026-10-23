@@ -22,7 +22,7 @@ A modern web application to watch and download YouTube videos without ads. Built
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/yt-downloader.git
+git clone https://github.com/WewennJr/yt-downloader.git
 cd yt-downloader
 
 # Install dependencies with uv
@@ -36,13 +36,13 @@ pip install -e .
 
 ```bash
 # Using uv
-uv run yt-web
+uv run yt-dl-web
 
 # Or directly
 python -m yt_downloader.web
 ```
 
-The app will be available at `http://localhost:5004`
+The app will be available at `http://localhost:5000`
 
 ### Command Line Usage
 
@@ -54,14 +54,10 @@ uv run yt-dl
 
 ## Usage
 
-1. Open `http://localhost:5004` in your browser
+1. Open `http://localhost:5000` in your browser
 2. Paste a YouTube URL (e.g., `https://www.youtube.com/watch?v=dQw4w9WgXcQ`)
 3. Click "Load Video" to fetch available formats
-4. Select your preferred:
-   - **Video Quality** - Resolution and frame rate
-   - **Audio Quality** - Bitrate and language
-   - **Subtitles** - Language (including auto-generated)
-5. Click **Play in Browser** to watch, or **Download** to save
+4. Click **Play in Browser** to watch, or **Download** to save
 
 ## Project Structure
 
@@ -78,6 +74,7 @@ yt-downloader/
         ├── templates/
         │   └── index.html  # Frontend UI
         └── static/         # Static assets (CSS, JS)
+            └── style.css   # Basic styling
 ```
 
 ## Technology Stack
@@ -88,11 +85,11 @@ yt-downloader/
 
 ## Configuration
 
-The app runs on `0.0.0.0:5004` by default. To change:
+The app runs on `0.0.0.0:5000` by default. To change:
 
 ```python
 # In src/yt_downloader/web.py
-app.run(host='0.0.0.0', port=8080)
+PORT = 5000  # Change to desired port
 ```
 
 ## License
