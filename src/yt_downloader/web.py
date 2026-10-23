@@ -47,6 +47,13 @@ elif COOKIES_BROWSER:
 else:
     print('[cookies] aucun cookie configuré (cookies.txt ou YT_COOKIES_BROWSER)')
 
+# --- Proxy (YT_PROXY) : pour sortir par une IP résidentielle quand l'IP du VPS est bloquée ---
+# ex : YT_PROXY=socks5://127.0.0.1:1080
+YT_PROXY = os.environ.get('YT_PROXY', '').strip()
+if YT_PROXY:
+    YDL_OPTS_BASE['proxy'] = YT_PROXY
+    print(f'[proxy] yt-dlp passe par : {YT_PROXY}')
+
 # ffmpeg est un programme externe : static-ffmpeg le télécharge au 1er lancement
 # et l'ajoute au PATH du process (sans rien faire si ffmpeg est déjà dans le PATH).
 static_ffmpeg.add_paths(weak=True)
@@ -74,8 +81,8 @@ def clean_error(e):
     """Message d'erreur lisible : retire les codes couleur de yt-dlp et explique le blocage anti-bot"""
     msg = re.sub(r'\x1b\[[0-9;]*m', '', str(e)).strip()
     if 'Sign in to confirm' in msg:
-        return ("YouTube bloque ce serveur (vérification anti-bot). Configure des cookies : "
-                "un fichier cookies.txt à côté de web.py, ou la variable YT_COOKIES_BROWSER=firefox.")
+        return ("YouTube bloque l'IP de ce serveur (vérification anti-bot). Configure un fichier "
+                "cookies.txt à côté de web.py et/ou un proxy résidentiel (variable YT_PROXY).")
     return msg
 
 
