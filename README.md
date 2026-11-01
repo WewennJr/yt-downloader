@@ -48,7 +48,7 @@ The app will be available at `http://localhost:5000`
 
 ```bash
 # Download a video (original CLI)
-uv run yt-dl
+uv run yt-dl-cli
 # Enter URL when prompted
 ```
 
