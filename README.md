@@ -59,24 +59,6 @@ uv run yt-dl-cli
 3. Click "Load Video" to fetch available formats
 4. Click **Play in Browser** to watch, or **Download** to save
 
-## Project Structure
-
-```
-yt-downloader/
-├── pyproject.toml          # Project config & dependencies
-├── README.md               # This file
-├── .gitignore
-└── src/
-    └── yt_downloader/
-        ├── __init__.py
-        ├── app.py          # Original CLI downloader
-        ├── web.py          # Flask web application
-        ├── templates/
-        │   └── index.html  # Frontend UI
-        └── static/         # Static assets (CSS, JS)
-            └── style.css   # Basic styling
-```
-
 ## Technology Stack
 
 - **Backend**: Flask 3.x, yt-dlp, requests
