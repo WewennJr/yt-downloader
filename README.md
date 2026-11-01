@@ -94,7 +94,7 @@ PORT = 5000  # Change to desired port
 
 ## License
 
-MIT License - feel free to use and modify.
+This project is licensed under the [MIT License](LICENSE). Feel free to use, modify, and distribute it!
 
 ## Disclaimer
 
